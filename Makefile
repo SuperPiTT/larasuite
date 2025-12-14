@@ -4,7 +4,7 @@
 
 .PHONY: help build up down restart logs shell db-shell redis-shell \
         install migrate fresh seed test coverage analyze format \
-        horizon queue clear cache optimize
+        horizon queue clear cache optimize init
 
 # Default target
 .DEFAULT_GOAL := help
@@ -171,3 +171,68 @@ reset: ## Reset everything (DANGER: destroys data)
 	sleep 10
 	$(MAKE) install
 	$(MAKE) fresh
+
+# =============================================================================
+# NEW PROJECT INITIALIZATION
+# =============================================================================
+
+# Project name for initialization (default: larasuite)
+PROJECT_NAME ?= larasuite
+ADMIN_EMAIL ?= admin@$(PROJECT_NAME).test
+ADMIN_PASSWORD ?= password
+
+init: ## Initialize new project from template (usage: make init PROJECT_NAME=myapp)
+	@echo "$(GREEN)Initializing new project: $(PROJECT_NAME)$(NC)"
+	@echo ""
+	@# 1. Copy environment file
+	@echo "$(YELLOW)1/8 Creating .env file...$(NC)"
+	@cp -n .env.example .env || true
+	@# 2. Replace project name in files
+	@echo "$(YELLOW)2/8 Configuring project name...$(NC)"
+	@sed -i 's/larasuite/$(PROJECT_NAME)/g' .env
+	@sed -i 's/larasuite/$(PROJECT_NAME)/g' docker-compose.yml
+	@sed -i 's/larasuite\.test/$(PROJECT_NAME).test/g' .env
+	@sed -i 's/larasuite\.test/$(PROJECT_NAME).test/g' playwright.config.ts
+	@# 3. Build and start containers
+	@echo "$(YELLOW)3/8 Building Docker containers...$(NC)"
+	@docker compose build
+	@echo "$(YELLOW)4/8 Starting containers...$(NC)"
+	@docker compose up -d
+	@echo "Waiting for services to be ready..."
+	@sleep 15
+	@# 4. Fix permissions and install dependencies
+	@echo "$(YELLOW)5/8 Installing PHP dependencies...$(NC)"
+	@docker exec -u root $(PROJECT_NAME)-php sh -c "chown -R larasuite:larasuite /var/www/html/vendor" 2>/dev/null || true
+	@docker compose exec php composer install
+	@# 5. Generate application key
+	@echo "$(YELLOW)6/8 Generating application key...$(NC)"
+	@docker compose exec php php artisan key:generate
+	@# 6. Run migrations
+	@echo "$(YELLOW)7/8 Running database migrations...$(NC)"
+	@docker compose exec php php artisan migrate --force
+	@docker compose exec php php artisan migrate --path=database/migrations/landlord --force
+	@# 7. Create admin user
+	@echo "$(YELLOW)8/8 Creating admin user...$(NC)"
+	@docker compose exec php php artisan tinker --execute="App\\Models\\User::create(['name'=>'Admin','email'=>'$(ADMIN_EMAIL)','password'=>bcrypt('$(ADMIN_PASSWORD)')])"
+	@# Done
+	@echo ""
+	@echo "$(GREEN)=============================================$(NC)"
+	@echo "$(GREEN)Project $(PROJECT_NAME) initialized!$(NC)"
+	@echo "$(GREEN)=============================================$(NC)"
+	@echo ""
+	@echo "URL:      http://$(PROJECT_NAME).test"
+	@echo "Email:    $(ADMIN_EMAIL)"
+	@echo "Password: $(ADMIN_PASSWORD)"
+	@echo ""
+	@echo "$(YELLOW)Next steps:$(NC)"
+	@echo "1. Add '127.0.0.1 $(PROJECT_NAME).test' to your hosts file"
+	@echo "2. Visit http://$(PROJECT_NAME).test/central/login"
+	@echo ""
+
+init-git: ## Reinitialize git for new project
+	@echo "$(YELLOW)Reinitializing git repository...$(NC)"
+	@rm -rf .git
+	@git init
+	@git add .
+	@git commit -m "Initial commit: $(PROJECT_NAME) from Larasuite template"
+	@echo "$(GREEN)Git reinitialized with fresh history$(NC)"
