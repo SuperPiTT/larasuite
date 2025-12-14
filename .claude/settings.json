@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(uv:*)",
+      "Bash(find:*)",
+      "Bash(mv:*)",
+      "Bash(grep:*)",
+      "Bash(npm:*)",
+      "Bash(ls:*)",
+      "Bash(cp:*)",
+      "Write",
+      "Edit",
+      "Bash(touch:*)",
+      "Bash(pip install:*)",
+      "Bash(uvicorn:*)",
+      "Bash(git worktree:*)",
+      "Bash(npx tsc:*)"
+    ],
+    "deny": []
+  },
+  "enabledMcpjsonServers": [],
+  "hooks": {}
+}

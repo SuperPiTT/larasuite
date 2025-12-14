@@ -1,0 +1,174 @@
+services:
+  # PHP-FPM Application Server
+  php:
+    build:
+      context: ./docker/php
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    container_name: larasuite-php
+    restart: unless-stopped
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html:cached
+      - php_vendor:/var/www/html/vendor
+      - ./docker/php/php.ini:/usr/local/etc/php/conf.d/custom.ini
+    networks:
+      - larasuite
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      PHP_IDE_CONFIG: "serverName=larasuite"
+
+  # Nginx Web Server
+  nginx:
+    image: nginx:alpine
+    container_name: larasuite-nginx
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-80}:80"
+    volumes:
+      - ./:/var/www/html:cached
+      - php_vendor:/var/www/html/vendor
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    networks:
+      - larasuite
+    depends_on:
+      - php
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: larasuite-postgres
+    restart: unless-stopped
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-larasuite}
+      POSTGRES_USER: ${DB_USERNAME:-larasuite}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      - larasuite
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-larasuite}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache & Queue
+  redis:
+    image: redis:7-alpine
+    container_name: larasuite-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - larasuite
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Horizon Queue Worker
+  horizon:
+    build:
+      context: ./docker/supervisor
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    container_name: larasuite-horizon
+    restart: unless-stopped
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html:cached
+      - php_vendor:/var/www/html/vendor
+    networks:
+      - larasuite
+    depends_on:
+      - php
+      - redis
+      - postgres
+
+  # Mailpit - Email Testing
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: larasuite-mailpit
+    restart: unless-stopped
+    ports:
+      - "${MAILPIT_DASHBOARD_PORT:-8025}:8025"
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+    networks:
+      - larasuite
+
+  # MinIO - S3-compatible Storage
+  minio:
+    image: minio/minio:latest
+    container_name: larasuite-minio
+    restart: unless-stopped
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-larasuite}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-secretkey}
+    volumes:
+      - minio_data:/data
+    networks:
+      - larasuite
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # Soketi - WebSockets Server (Pusher-compatible)
+  soketi:
+    image: quay.io/soketi/soketi:latest-16-alpine
+    container_name: larasuite-soketi
+    restart: unless-stopped
+    ports:
+      - "${SOKETI_PORT:-6001}:6001"
+      - "${SOKETI_METRICS_PORT:-9601}:9601"
+    environment:
+      SOKETI_DEBUG: "1"
+      SOKETI_DEFAULT_APP_ID: ${PUSHER_APP_ID:-larasuite}
+      SOKETI_DEFAULT_APP_KEY: ${PUSHER_APP_KEY:-larasuite-key}
+      SOKETI_DEFAULT_APP_SECRET: ${PUSHER_APP_SECRET:-larasuite-secret}
+    networks:
+      - larasuite
+
+  # Node.js for Vite/Assets (development only)
+  node:
+    build:
+      context: .
+      dockerfile: docker/node/Dockerfile
+    container_name: larasuite-node
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html
+      - node_modules:/var/www/html/node_modules
+    networks:
+      - larasuite
+    ports:
+      - "${VITE_PORT:-5173}:5173"
+    profiles:
+      - dev
+
+networks:
+  larasuite:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  php_vendor:
+  node_modules:

@@ -1,0 +1,42 @@
+{
+    "name": "larasuite/skeleton",
+    "description": "Skeleton package template for Larasuite modules",
+    "type": "library",
+    "license": "proprietary",
+    "authors": [
+        {
+            "name": "Larasuite Team"
+        }
+    ],
+    "require": {
+        "php": "^8.4"
+    },
+    "require-dev": {
+        "pestphp/pest": "^3.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Larasuite\\Skeleton\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Larasuite\\Skeleton\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Larasuite\\Skeleton\\Infrastructure\\Providers\\SkeletonServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

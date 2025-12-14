@@ -1,0 +1,49 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    # Maximum strictness level
+    level: 9
+
+    paths:
+        - app
+        - config
+        - database
+        - routes
+        - tests
+        - packages
+
+    excludePaths:
+        - vendor
+        - storage
+        - bootstrap/cache
+        - packages/*/vendor
+
+    # Treat phpdoc types as certain
+    treatPhpDocTypesAsCertain: false
+
+    # Report unmatched ignored errors
+    reportUnmatchedIgnoredErrors: true
+
+    # Check missing typehints
+    checkMissingIterableValueType: true
+    checkGenericClassInNonGenericObjectType: true
+
+    # Stricter checks
+    checkTooWideReturnTypesInProtectedAndPublicMethods: true
+    checkUninitializedProperties: true
+    checkImplicitMixed: true
+    checkBenevolentUnionTypes: true
+
+    # Laravel specific
+    checkModelProperties: true
+    checkOctaneCompatibility: true
+
+    # Ignored errors (add patterns here as needed)
+    ignoreErrors:
+        # Example: - '#Call to an undefined method Illuminate\\Database\\Eloquent\\Builder#'
+
+    # Type aliases for common patterns
+    typeAliases:
+        PositiveInt: 'int<1, max>'
+        NonNegativeInt: 'int<0, max>'
